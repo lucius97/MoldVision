@@ -1,0 +1,29 @@
+# multiple datasets configuration
+datasets:
+  - name: "train"
+    path: "data/raw/train.csv"
+    transform: "train"
+  - name: "val"
+    path: "data/raw/val.csv"
+    transform: "val"
+  - name: "test"
+    path: "data/raw/test.csv"
+
+# common DataModule settings
+data_module:
+  batch_size: 32
+  num_workers: 4
+
+# model settings
+model:
+  name: "VGG16Twin"
+  lr: 0.001
+  num_classes: 2
+  pretrained: false
+
+# trainer settings
+trainer:
+  max_epochs: 20
+  gpus: 1
+  precision: 32
+  logger: "neptune"    # or "tensorboard"

@@ -1,4 +1,4 @@
-from src.models import MoldVGG_Twin, MoldVGG_6Chan, MoldVGG_Default
+from src.models import MoldVision, MoldVGG_6Chan, MoldVGG_Default
 from src.data   import MoldDataModule
 import argparse
 import pytorch_lightning as pl
@@ -20,7 +20,7 @@ def train_one_fold(args, fold_idx):
 
     # --- 2) Pick model ---
     if args.model == "twin":
-        model = MoldVGG_Twin(opt_lr=args.lr, lr_pat=args.patience, out_features=args.out_features)
+        model = MoldVision(opt_lr=args.lr, lr_pat=args.patience, out_features=args.out_features)
     elif args.model == "6chan":
         model = MoldVGG_6Chan(opt_lr=args.lr, lr_pat=args.patience, out_features=args.out_features)
     else:

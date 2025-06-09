@@ -1,9 +1,21 @@
+"""
+MoldVGG_6Chan
+------------
+
+A PyTorch-Lightning module that takes
+one 6-channel image comprised out of 2 Images concatenated together
+
+Usage:
+    model = MoldVGG_6Chan(opt_lr=0.01, lr_pat=5, batch_size=32, num_epochs=20)
+    trainer = pl.Trainer()
+    trainer.fit(model, train_dataloader, val_dataloader)
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as L
 from torchvision import models
-from torchmetrics import MetricCollection, Accuracy, Precision, Recall, F1Score, AUROC, AveragePrecision, Specificity
 
 class MoldVGG_6Chan(L.LightningModule):
     """
@@ -55,78 +67,61 @@ class MoldVGG_6Chan(L.LightningModule):
         )
         self.classifier = nn.Linear(4096, out_features)
 
-        # Metrics
-        metrics = MetricCollection({
-            'acc': Accuracy(task="multiclass", average="weighted", num_classes=self.hparams.out_features),
-            'prec': Precision(task="multiclass", average="weighted",
-                                           num_classes=self.hparams.out_features),
-            'recall': Recall(task="multiclass", average="weighted", num_classes=self.hparams.out_features),
-            'f1': F1Score(task="multiclass", average="weighted", num_classes=self.hparams.out_features),
-        })
-        self.train_metrics = metrics.clone(prefix='train/')
-        self.val_metrics = metrics.clone(prefix='val/')
+        # 4) Loss Function
+        self.loss_fn = nn.CrossEntropyLoss()
 
-        perclass = MetricCollection({
-            'acc': Accuracy(task="multiclass", average=None, num_classes=self.hparams.out_features),
-            'prec': Precision(task="multiclass", average=None, num_classes=self.hparams.out_features),
-            'recall': Recall(task="multiclass", average=None, num_classes=self.hparams.out_features),
-            'f1': F1Score(task="multiclass", average=None, num_classes=self.hparams.out_features),
-            'auroc': AUROC(task="multiclass", average=None, num_classes=self.hparams.out_features),
-            'avprc': AveragePrecision(task="multiclass", average=None, num_classes=self.hparams.out_features),
-            'spec': Specificity(task="multiclass", average=None, num_classes=self.hparams.out_features),
-        })
-        self.test_metrics = perclass.clone(prefix='test/')
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        feats = self.base.features(x)
-        emb   = self.head(feats)
-        logits = self.classifier(emb)
-        return logits
+    def forward(self, img_f, img_b):
+        # Extract & pool features
+        f1 = self.branch_top(img_f)
+        f2 = self.branch_bottom(img_b)
+        # Concatenate and classify
+        return self.classifier(torch.cat([f1, f2], dim=1))
 
     def configure_optimizers(self):
-        optimizer = optim.SGD(self.parameters(), lr=self.hparams.opt_lr)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            patience=self.hparams.lr_pat,
-        )
+        opt = optim.SGD(self.parameters(), lr=self.hparams.opt_lr, momentum=0.9, weight_decay=1e-4)
+        sched = optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min',
+                                                     patience=self.hparams.lr_pat,
+                                                     verbose=True)
         return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val/acc_epoch"
+            'optimizer': opt,
+            'lr_scheduler': {
+                'scheduler': sched,
+                'monitor': 'val/loss',
             }
         }
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = nn.functional.cross_entropy(logits, y)
-        self.log("train/loss", loss, on_epoch=True)
-        self.log_dict(self.train_metrics(logits, y), on_epoch=True)
+        imgs_f, imgs_b, labels = batch[:3]
+        logits = self(imgs_f, imgs_b)
+        loss = self.loss_fn(logits, labels)
+        self.log('train/loss', loss, on_step=True, on_epoch=True)
+        self.log_dict(self.train_metrics(logits, labels),
+                      on_step=True, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = nn.functional.cross_entropy(logits, y)
-        self.log("val/loss", loss, on_epoch=True)
-        self.log_dict(self.val_metrics(logits, y), on_epoch=True)
-        return {"logits": logits, "labels": y}
+        imgs_f, imgs_b, labels = batch[:3]
+        logits = self(imgs_f, imgs_b)
+        loss = self.loss_fn(logits, labels)
+        self.log('val/loss', loss, on_epoch=True)
+        self.log_dict(self.val_metrics(logits, labels), on_epoch=True)
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = nn.functional.cross_entropy(logits, y)
-        self.log("test/loss", loss, on_epoch=True)
-        return {"logits": logits, "labels": y}
+        imgs_f, imgs_b, labels = batch[:3]
+        logits = self(imgs_f, imgs_b)
+        return {'logits': logits, 'labels': labels}
 
     def test_epoch_end(self, outputs):
         all_logits = torch.cat([o['logits'] for o in outputs], dim=0)
         all_labels = torch.cat([o['labels'] for o in outputs], dim=0)
-        self.log_dict(self.test_metrics(all_logits, all_labels), on_epoch=True)
+        self.log_dict(self.test_metrics(all_logits, all_labels),
+                      on_epoch=True)
 
     def predict_step(self, batch, batch_idx):
-        x, y, names = batch
-        logits = self(x)
+        imgs_f, imgs_b, labels, names = batch
+        logits = self(imgs_f, imgs_b)
         preds = logits.argmax(dim=1)
-        return {"preds": preds, "logits": logits, "labels": y, "names": names}
+        return {'preds': preds,
+                'logits': logits,
+                'labels': labels,
+                'name': names}

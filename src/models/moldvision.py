@@ -24,23 +24,19 @@ class MoldVision(L.LightningModule):
     """Twin‐branch VGG16 classifier for paired‐image inputs."""
 
     def __init__(self,
-                 opt_lr: float,
-                 lr_pat: int,
-                 batch_size,
-                 num_epochs,
-                 dropout_p=0.5,
-                 out_features=5):
-
-        """Initialize the twin‐branch model.
-
-        Args:
-            opt_lr: initial learning rate for SGD
-            lr_pat: scheduler patience (epochs with no improvement)
-            out_features: number of classes
-            dropout_p: dropout probability in heads
-        """
+            config: dict  # All settings loaded from Defaults.yaml
+    ) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters("config")
+
+        # Unpack relevant parameters from config
+        self.opt_lr = config['LEARNING_RATE']
+        self.lr_pat = config['LR_PATIENCE']  # fallback if not in config
+        self.batch_size = config['BATCH_SIZE']
+        self.num_epochs = config['NUM_EPOCHS']
+        self.dropout_p = config['DROPOUT_RATE']
+        self.out_features = len(config['CLASS_NAMES'])
+        self.weight_decay = config['WEIGHT_DECAY']
 
         # 1) Load & freeze VGG16 backbone, drop its classifier
         self.base = models.vgg16(weights='DEFAULT')
@@ -55,7 +51,7 @@ class MoldVision(L.LightningModule):
                 nn.Flatten(),  # → (batch, 512*7*7)
                 nn.Linear(512 * 7 * 7, 4096),
                 nn.ReLU(inplace=True),
-                nn.Dropout(dropout_p)
+                nn.Dropout(self.dropout_p)
             )
 
         # 3) instantiate two separate heads (their Linear layers do *not* share weights)
@@ -66,11 +62,11 @@ class MoldVision(L.LightningModule):
         self.classifier = nn.Sequential(
             nn.Linear(4096 * 2, 4096),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout_p),
+            nn.Dropout(self.dropout_p),
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout_p),
-            nn.Linear(4096, self.hparams.out_features)
+            nn.Dropout(self.dropout_p),
+            nn.Linear(4096, self.out_features)
         )
 
         # 5) Loss Function
@@ -84,9 +80,9 @@ class MoldVision(L.LightningModule):
         return self.classifier(torch.cat([f1, f2], dim=1))
 
     def configure_optimizers(self):
-        opt = optim.SGD(self.parameters(), lr=self.hparams.opt_lr, momentum=0.9, weight_decay=1e-4)
+        opt = optim.SGD(self.parameters(), lr=self.opt_lr, momentum=0.9, weight_decay=self.weight_decay)
         sched = optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min',
-                                                     patience=self.hparams.lr_pat,
+                                                     patience=self.lr_pat,
                                                      verbose=True)
         return {
             'optimizer': opt,

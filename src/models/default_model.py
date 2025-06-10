@@ -15,7 +15,6 @@ import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as L
 from torchvision import models
-from
 
 class MoldVGG_Default(L.LightningModule):
     """
@@ -25,40 +24,41 @@ class MoldVGG_Default(L.LightningModule):
 
     def __init__(
         self,
-        opt_lr: float,
-        lr_pat: int,
-        batch_size: int,
-        num_epochs: int,
-        dropout_p=0.5,
-        out_features: int = 5,
+        config: dict  # All settings loaded from Defaults.yaml
     ) -> None:
-
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters("config")
+
+        # Unpack relevant parameters from config
+        self.opt_lr = config['LEARNING_RATE']
+        self.lr_pat = config['LR_PATIENCE']  # fallback if not in config
+        self.batch_size = config['BATCH_SIZE']
+        self.num_epochs = config['NUM_EPOCHS']
+        self.dropout_p = config['DROPOUT_RATE']
+        self.out_features = len(config['CLASS_NAMES'])
+        self.weight_decay = config['WEIGHT_DECAY']
 
         # Load VGG16, freeze features
         self.base = models.vgg16(weights='DEFAULT')
         for p in self.base.features.parameters():
             p.requires_grad = False
 
-        # Replace the classifier's final layer
-        self.model.classifier[6] = nn.Linear(in_features=4096, out_features=self.hparams.out_features, bias=True)
-        self.model.classifier[6].requires_grad = True
+        # Replace the classifier's final layer according to out_features
+        self.base.classifier[6] = nn.Linear(in_features=4096, out_features=self.out_features, bias=True)
+        self.base.classifier[6].requires_grad = True
 
-        # 5) Loss Function
+        # Optionally adjust dropout
+        self.base.classifier[5] = nn.Dropout(self.dropout_p)
+
         self.loss_fn = nn.CrossEntropyLoss()
 
-    def forward(self, img_f, img_b):
-        # Extract & pool features
-        f1 = self.branch_top(img_f)
-        f2 = self.branch_bottom(img_b)
-        # Concatenate and classify
-        return self.classifier(torch.cat([f1, f2], dim=1))
+    def forward(self, x):
+        return self.base(x)
 
     def configure_optimizers(self):
-        opt = optim.SGD(self.parameters(), lr=self.hparams.opt_lr, momentum=0.9, weight_decay=1e-4)
+        opt = optim.SGD(self.parameters(), lr=self.opt_lr, momentum=0.9, weight_decay=self.weight_decay)
         sched = optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min',
-                                                     patience=self.hparams.lr_pat,
+                                                     patience=self.lr_pat,
                                                      verbose=True)
         return {
             'optimizer': opt,

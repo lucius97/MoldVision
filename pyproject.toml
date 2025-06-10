@@ -32,12 +32,8 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.dynamic]
-# Uncomment if you want setuptools to automatically include README as long description
-# long_description = {file = ["README.md"]}
 
 [tool.setuptools.include-package-data]
-# If you have non-Python files inside your packages (like data, configs, etc.)
-# This includes files specified in MANIFEST.in
 include_package_data = true
 
 [tool.coverage.run]

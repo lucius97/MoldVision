@@ -14,20 +14,20 @@ This module provides functions to compute and preprocess features for the LGBM p
   - extract_and_save_features: run all channels and save to .npz
 
 Example:
-    from data.feature_extraction import generate_masks, extract_and_save_features
+    from databases.feature_extraction import generate_masks, extract_and_save_features
 
     # 1) generate masks
     mask_paths = generate_masks(
-        image_dir="data/images",
-        mask_dir="data/masks",
+        image_dir="databases/images",
+        mask_dir="databases/masks",
     )
 
     # 2) extract and save features
     extract_and_save_features(
-        image_dir="data/images",
-        mask_dir="data/masks",
-        labels_csv="data/labels.csv",
-        output_path="data/features.npz",
+        image_dir="databases/images",
+        mask_dir="databases/masks",
+        labels_csv="databases/labels.csv",
+        output_path="databases/features.npz",
         image_size=(256,256)
     )
 """
@@ -110,17 +110,23 @@ def get_center(image_path: str) -> Tuple[int, int, int]:
     return int(x), int(y), int(r)
 
 
-def generate_circle_mask(
-    shape: Tuple[int, int],
-    center: Tuple[int, int],
-    radius: int
-) -> np.ndarray:
+def generate_circle_mask(img_shape, center=None, radius=None):
     """
-    Generate a binary circular mask of given shape at center with radius.
+    Generate a binary circle mask for the given image shape.
+    :param img_shape: (height, width) of the image.
+    :param center: (x, y) coordinates of the circle center. Defaults to image center.
+    :param radius: Radius of the circle. Defaults to the largest possible that fits.
+    :return: Binary mask as np.ndarray.
     """
-    mask = np.zeros(shape, dtype=np.uint8)
-    cv2.circle(mask, center, radius, 255, -1)
+    height, width = img_shape[:2]
+    if center is None:
+        center = (width // 2, height // 2)
+    if radius is None:
+        radius = min(center[0], center[1], width - center[0], height - center[1])
+    mask = np.zeros((height, width), dtype=np.uint8)
+    cv2.circle(mask, center, radius, color=255, thickness=-1)
     return mask
+
 
 
 def generate_masks(

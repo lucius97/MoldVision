@@ -47,7 +47,7 @@ class MoldDataset(Dataset):
     def __init__(
         self,
         root: str,
-        fold_csv: str,    # This is (usually) a CSV with only the data of this fold!
+        fold_csv: str,    # This is (usually) a CSV with only the databases of this fold!
         mode: str = 'default',
         transform: Optional[transforms.Compose] = None,
         group_col: str = 'ID',
@@ -60,7 +60,7 @@ class MoldDataset(Dataset):
         self.group_col = group_col
         self.pos_col = pos_col
 
-        # Load the fold's data (train/val/test for this fold)
+        # Load the fold's databases (train/val/test for this fold)
         self.df = pd.read_csv(fold_csv)
 
         # Optionally load the full database csv for lookups (top/bottom matching, etc)
@@ -176,7 +176,7 @@ class MoldDataModule(pl.LightningDataModule):
         data_path = os.path.join(self.hparams.data_dir, 'dataset.csv')
         data = pd.read_csv(data_path)
 
-        # Optionally filter data before making folds
+        # Optionally filter databases before making folds
         if filter_fn is not None:
             data = filter_fn(data)
 
@@ -242,13 +242,13 @@ class MoldDataModule(pl.LightningDataModule):
         Sets up dataset splits (train/val/test/predict) for each stage.
 
         Args:
-            stage: The stage for which to set up data. One of None, 'fit', 'test', 'predict'.
+            stage: The stage for which to set up databases. One of None, 'fit', 'test', 'predict'.
             main_csv: Path to the main/reference CSV file (if required by the dataset).
                       If None, a default is used.
 
         This method loads each split from its respective fold CSV,
         and optionally allows overriding the main CSV to make the
-        data setup agnostic to a specific file name or structure.
+        databases setup agnostic to a specific file name or structure.
         """
         base = self.hparams.data_dir
         get_fold = lambda kind: os.path.join(base, 'folds', f"{kind}_fold_{self.hparams.fold_idx}.csv")

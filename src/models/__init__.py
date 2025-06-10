@@ -1,5 +1,5 @@
 from default_model import MoldVGG_Default
-from twin_model import MoldVision
+from moldvision import MoldVision
 from sixchan_model import MoldVGG_6Chan
 
 __all__ = [

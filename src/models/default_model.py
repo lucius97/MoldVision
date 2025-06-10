@@ -1,9 +1,21 @@
+"""
+MoldVGG_Default
+------------
+
+A PyTorch-Lightning module that takes one standard 3-channel image
+
+Usage:
+    model = MoldVGG_Default(opt_lr=0.01, lr_pat=5, batch_size=32, num_epochs=20)
+    trainer = pl.Trainer()
+    trainer.fit(model, train_dataloader, val_dataloader)
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as L
 from torchvision import models
-from torchmetrics import MetricCollection, Accuracy, Precision, Recall, F1Score, AUROC, AveragePrecision, Specificity
+from
 
 class MoldVGG_Default(L.LightningModule):
     """

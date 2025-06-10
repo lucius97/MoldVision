@@ -3,11 +3,11 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = ""
+name = "Moldvision Toolkit"
 version = "0.1.0"
 description = "A PyTorch VGG16 classifier"
 authors = [{ name="Lukas Weber", email="lukas.weber6@uzh.ch" }]
-license = { text = "MIT" }
+license = { text = "BSD 3-Clause" }
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -17,5 +17,36 @@ dependencies = [
   "torchmetrics>=1.71"
 ]
 
+[project.urls]
+Homepage = "https://github.com/lucius97/moldvision-toolkit"
+Repository = "https://github.com/lucius97/moldvision-toolkit"
+Issues = "https://github.com/lucius97/moldvision-toolkit/issues"
+
 [project.scripts]
 train_model = "models.run:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+# Uncomment if you want setuptools to automatically include README as long description
+# long_description = {file = ["README.md"]}
+
+[tool.setuptools.include-package-data]
+# If you have non-Python files inside your packages (like data, configs, etc.)
+# This includes files specified in MANIFEST.in
+include_package_data = true
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
